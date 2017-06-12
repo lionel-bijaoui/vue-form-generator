@@ -1,31 +1,50 @@
 <template lang="pug">
-div
-	fieldset.vue-form-generator(v-if='schema != null', :is='tag')
+div.vue-form-generator(v-if='schema != null')
+	fieldset(v-if="schema.fields", :is='tag')
 		template(v-for='field in fields')
 			.form-group(v-if='fieldVisible(field)', :class='getFieldRowClasses(field)')
-				label
+				label(v-if="fieldTypeHasLabel(field)", :for="getFieldID(field)")
 					| {{ field.label }}
 					span.help(v-if='field.help')
 						i.icon
 						.helpText(v-html='field.help')
 				.field-wrap
-					component(:is='getFieldType(field)', :disabled='fieldDisabled(field)', :model='model', :schema.sync='field', @model-updated='modelUpdated', @validated="onFieldValidated")
+					component(:is='getFieldType(field)', :disabled='fieldDisabled(field)', :model='model', :schema='field', :formOptions='options', @model-updated='modelUpdated', @validated="onFieldValidated")
 					.buttons(v-if='buttonVisibility(field)')
-						button(v-for='btn in field.buttons', @click='btn.onclick(model, field)', :class='btn.classes') {{ btn.label }}
+						button(v-for='btn in field.buttons', @click='buttonClickHandler(btn, field, $event)', :class='btn.classes') {{ btn.label }}
 				.hint(v-if='field.hint') {{ field.hint }}
 				.errors.help-block(v-if='fieldErrors(field).length > 0')
 					span(v-for='(error, index) in fieldErrors(field)', track-by='index') {{ error }}
+
+	template(v-for='group in groups')
+		fieldset
+			legend(v-if='group.legend') {{ group.legend }}
+			template(v-for='field in group.fields')
+				.form-group(v-if='fieldVisible(field)', :class='getFieldRowClasses(field)')
+					label(v-if="fieldTypeHasLabel(field)", :for="getFieldID(field)")
+						| {{ field.label }}
+						span.help(v-if='field.help')
+							i.icon
+							.helpText(v-html='field.help')
+					.field-wrap
+						component(:is='getFieldType(field)', :disabled='fieldDisabled(field)', :model='model', :schema='field', :formOptions='options',@model-updated='modelUpdated', @validated="onFieldValidated")
+						.buttons(v-if='buttonVisibility(field)')
+							button(v-for='btn in field.buttons', @click='buttonClickHandler(btn, field, $event)', :class='btn.classes') {{ btn.label }}
+					.hint(v-if='field.hint') {{ field.hint }}
+					.errors.help-block(v-if='fieldErrors(field).length > 0')
+						span(v-for='(error, index) in fieldErrors(field)', track-by='index') {{ error }}
 </template>
 
 <script>
 	// import Vue from "vue";
 	import {each, isFunction, isNil, isArray, isString} from "lodash";
+	import { slugifyFormID } from "./utils/schema";
 
 	// Load all fields from '../fields' folder
 	let fieldComponents = {};
 
 	let coreFields = require.context("./fields/core", false, /^\.\/field([\w-_]+)\.vue$/);
-				
+
 	each(coreFields.keys(), (key) => {
 		let compName = key.replace(/^\.\//, "").replace(/\.vue/, "");
 		fieldComponents[compName] = coreFields(key);
@@ -33,7 +52,7 @@ div
 
 	if (process.env.FULL_BUNDLE) {  // eslint-disable-line
 		let Fields = require.context("./fields/optional", false, /^\.\/field([\w-_]+)\.vue$/);
-				
+
 		each(Fields.keys(), (key) => {
 			let compName = key.replace(/^\.\//, "").replace(/\.vue/, "");
 			fieldComponents[compName] = Fields(key);
@@ -44,7 +63,7 @@ div
 
 	export default {
 		components: fieldComponents,
-		
+
 		props: {
 			schema: Object,
 
@@ -80,7 +99,7 @@ div
 				}
 			}
 		},
-		
+
 		data () {
 			return {
 				errors: [] // Validation errors
@@ -90,10 +109,20 @@ div
 		computed: {
 			fields() {
 				let res = [];
-				if (this.schema) {
+				if (this.schema && this.schema.fields) {
 					each(this.schema.fields, (field) => {
 						if (!this.multiple || field.multi === true)
 							res.push(field);
+					});
+				}
+
+				return res;
+			},
+			groups() {
+				let res = [];
+				if (this.schema && this.schema.groups) {
+					each(this.schema.groups, (group) => {
+						res.push(group);
 					});
 				}
 
@@ -131,16 +160,16 @@ div
 				}
 			});
 		},
-	
+
 		methods: {
 			// Get style classes of field
 			getFieldRowClasses(field) {
 				const hasErrors = this.fieldErrors(field).length > 0;
 				let baseClasses = {
 					error: hasErrors,
-					disabled: this.fieldDisabled(field), 
-					readonly: this.fieldReadonly(field), 
-					featured: this.fieldFeatured(field), 
+					disabled: this.fieldDisabled(field),
+					readonly: this.fieldReadonly(field),
+					featured: this.fieldFeatured(field),
 					required: this.fieldRequired(field)
 				};
 
@@ -170,6 +199,26 @@ div
 			// Get type of field 'field-xxx'. It'll be the name of HTML element
 			getFieldType(fieldSchema) {
 				return "field-" + fieldSchema.type;
+			},
+
+			// Should field type have a label?
+			fieldTypeHasLabel(field) {
+				let relevantType = "";
+				if (field.type === "input") {
+					relevantType = field.inputType;
+				} else {
+					relevantType = field.type;
+				}
+
+				switch (relevantType) {
+				case "button":
+				case "image":
+				case "submit":
+				case "reset":
+					return false;
+				default:
+					return true;
+				}
 			},
 
 			// Get disabled attr of field
@@ -203,7 +252,7 @@ div
 					return true;
 
 				return field.visible;
-			},		
+			},
 
 			// Get readonly prop of field
 			fieldReadonly(field) {
@@ -214,7 +263,7 @@ div
 					return false;
 
 				return field.readonly;
-			},		
+			},
 
 			// Get featured prop of field
 			fieldFeatured(field) {
@@ -225,6 +274,10 @@ div
 					return false;
 
 				return field.featured;
+			},
+
+			buttonClickHandler(btn, field, event) {
+				return btn.onclick.call(this, this.model, field, event, this);
 			},
 
 			// Child field executed validation
@@ -288,28 +341,33 @@ div
 			fieldErrors(field) {
 				let res = this.errors.filter(e => e.field == field);
 				return res.map(item => item.error);
-			}
+			},
+
+			getFieldID(schema) {
+				const idPrefix = this.options && this.options.fieldIdPrefix ? this.options.fieldIdPrefix : "";
+				return slugifyFormID(schema, idPrefix);
+			}			
 		}
 	};
-	
+
 </script>
 
 <style lang="sass">
-	
+
 	$errorColor: #F00;
 
-	fieldset.vue-form-generator {
+	.vue-form-generator {
 
 		* {
 			box-sizing: border-box;
-		}		
-		
+		}
+
 		.form-control {
 			// Default Bootstrap .form-control style
 			display: block;
-            &:not([class*=" col-"]){
-                width: 100%;
-            }
+				&:not([class*=" col-"]){
+					width: 100%;
+				}
 			padding: 6px 12px;
 			font-size: 14px;
 			line-height: 1.42857143;
@@ -319,10 +377,10 @@ div
 			border: 1px solid #ccc;
 			border-radius: 4px;
 			box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075);
-			transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;	
+			transition: border-color ease-in-out .15s, box-shadow ease-in-out .15s;
 
 		} // .form-control
-		
+
 		span.help {
 			margin-left: 0.3em;
 			position: relative;
@@ -377,7 +435,7 @@ div
 				opacity: 1;
 				pointer-events: auto;
 				transform: translateY(0px);
-			}		
+			}
 
 		} // span.help
 
@@ -389,11 +447,11 @@ div
 				margin-left: 4px;
 			}
 
-			button, input[type=submit] {					
+			button, input[type=submit] {
 				// Default Bootstrap button style
 				display: inline-block;
 				padding: 6px 12px;
-				margin: 0px;					
+				margin: 0px;
 				font-size: 14px;
 				font-weight: normal;
 				line-height: 1.42857143;
@@ -429,11 +487,11 @@ div
 				&:disabled {
 					opacity: 0.6;
 					cursor: not-allowed;
-				}				
+				}
 
 			} // button, input[submit]
 
-		} // .field-wrap		
+		} // .field-wrap
 
 		.hint {
 			font-style: italic;
@@ -455,7 +513,7 @@ div
 			&.featured {
 				> label {
 					font-weight: bold;
-				}			
+				}
 			}
 
 			&.required {
@@ -463,17 +521,17 @@ div
 					content: "*";
 					font-weight: normal;
 					color: Red;
-					position: absolute;
+					// position: absolute;
 					padding-left: 0.2em;
 					font-size: 1em;
-				}	
+				}
 			}
 
 			&.disabled {
 				> label {
 					color: #666;
 					font-style: italic;
-				}			
+				}
 			}
 
 			&.error {
@@ -496,7 +554,7 @@ div
 							font-weight: 600;
 					}
 
-				} // .errors	
+				} // .errors
 
 			} // .error
 

@@ -1,7 +1,8 @@
 <template lang="pug">
 .wrapper
 	input.form-control(
-		:type="schema.inputType", 
+		:id="getFieldID(schema)",
+		:type="schema.inputType",
 		:value="value",
 		@input="value = $event.target.value",
 		@change="onChange",
@@ -47,39 +48,67 @@
 					this.value = event.target.files;
 				}
 			},
+			
 			formatValueToField(value) {
 				if (value != null) {
+					let dt;
 					switch(this.schema.inputType){
 					case "date":
-						return fecha.format(value, "YYYY-MM-DD");
+						dt = this.schema.format ? fecha.parse(value, this.schema.format) : new Date(value);
+						return fecha.format(dt, "YYYY-MM-DD");
 					case "datetime":
-						return fecha.format(value, "YYYY-MM-DD HH:mm:ss");
+						dt = this.schema.format ? fecha.parse(value, this.schema.format) : new Date(value);
+						return fecha.format(dt, "YYYY-MM-DD HH:mm:ss");
 					case "datetime-local":
-						return fecha.format(value, "YYYY-MM-DDTHH:mm:ss");
+						dt = this.schema.format ? fecha.parse(value, this.schema.format) : new Date(value);
+						return fecha.format(dt, "YYYY-MM-DDTHH:mm:ss");
 					}
 				}
 				
 				return value;
 			},
+
 			formatValueToModel(value) {
 				if (value != null) {
+					let m;
 					switch (this.schema.inputType){
 					case "date":
-						return fecha.parse(value, "YYYY-MM-DD");
+						m = fecha.parse(value, "YYYY-MM-DD");
+						if (m !== false) {
+							if (this.schema.format)
+								value = fecha.format(m, this.schema.format);
+							else
+								value = m.valueOf();
+						}
+						break;
 					case "datetime":
-						return fecha.parse(value, "YYYY-MM-DD HH:mm:ss");
+						m = fecha.parse(value, "YYYY-MM-DD HH:mm:ss");
+						if (m !== false) {
+							if (this.schema.format)
+								value = fecha.format(m, this.schema.format);
+							else
+								value = m.valueOf();
+						}
+						break;
 					case "datetime-local":
-						return fecha.parse(value, "YYYY-MM-DDTHH:mm:ss");
+						m = fecha.parse(value, "YYYY-MM-DDTHH:mm:ss");
+						if (m !== false) {
+							if (this.schema.format)
+								value = fecha.format(m, this.schema.format);
+							else
+								value = m.valueOf();
+						}
+						break;
 					case "number":
 						return Number(value);
 					}
 				}
-				
+
 				return value;
 			}
 		}
 	};
-	
+
 </script>
 
 <style lang="sass">

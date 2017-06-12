@@ -40,6 +40,7 @@ module.exports = {
 			model: "firstName",
 			featured: true,
 			required: true,
+			help: "First name of user",
 			placeholder: "User's first name",
 			styleClasses: "half-width",
 			validator: validators.string,
@@ -95,6 +96,7 @@ module.exports = {
 			label: "Date",
 			model: "dob",
 			styleClasses: "half-width"
+			//format: "YYYY.MM.DD HH:mm:ss"
 		}, {
 			type: "input",
 			inputType: "datetime",
@@ -351,18 +353,7 @@ module.exports = {
 				classes: "btn-location",
 				label: "Current location",
 				onclick: function(model) {
-					if (navigator.geolocation) {
-						navigator.geolocation.getCurrentPosition((pos) => {
-							if (!model.address)
-								model.address = {};
-							if (!model.address.geo)
-								model.address.geo = {};
-							model.address.geo.latitude = pos.coords.latitude.toFixed(5);
-							model.address.geo.longitude = pos.coords.longitude.toFixed(5);
-						});
-					} else {
-						alert("Geolocation is not supported by this browser.");
-					}
+					return this.$parent.getLocation(model);
 				}
 			}, {
 				classes: "btn-clear",

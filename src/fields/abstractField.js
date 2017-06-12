@@ -1,5 +1,6 @@
 import { get as objGet, each, isFunction, isString, isArray } from "lodash";
 import validators from "../utils/validators";
+import { slugifyFormID } from "../utils/schema";
 
 function convertValidator(validator) {
 	if (isString(validator)) {
@@ -17,6 +18,7 @@ export default {
 	props: [
 		"model",
 		"schema",
+		"formOptions",
 		"disabled"
 	],
 
@@ -53,7 +55,7 @@ export default {
 				if (isFunction(this.schema.set)) {
 					this.schema.set(this.model, newValue);
 					changed = true;
-					
+
 				} else if (this.schema.model) {
 					this.setModelValueByPath(this.schema.model, newValue);
 					changed = true;
@@ -68,7 +70,7 @@ export default {
 
 					if (this.$parent.options && this.$parent.options.validateAfterChanged === true){
 						this.validate();
-					}					
+					}
 				}
 			}
 		}
@@ -133,7 +135,7 @@ export default {
 		setModelValueByPath(path, value) {
 			// convert array indexes to properties
 			let s = path.replace(/\[(\w+)\]/g, ".$1");
-			
+
 			// strip a leading dot
 			s = s.replace(/^\./, "");
 
@@ -157,9 +159,15 @@ export default {
 					this.$root.$set(o, k, value);
 					return;
 				}
-				
+
 				++i;
 			}
+		},
+
+		getFieldID(schema) {
+			const idPrefix = this.formOptions && this.formOptions.fieldIdPrefix ? this.formOptions.fieldIdPrefix : "";
+			return slugifyFormID(schema, idPrefix);
 		}
+
 	}
 };
