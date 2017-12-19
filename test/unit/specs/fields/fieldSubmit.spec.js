@@ -21,7 +21,8 @@ describe("fieldSubmit.vue", function() {
 			type: "submit",
 			buttonText: "Submit form",
 			validateBeforeSubmit: false,
-			onSubmit() {}
+			onSubmit() {},
+			fieldClasses: ["applied-class", "another-class"]
 		};
 		let model = { name: "John Doe" };
 		let input;
@@ -40,27 +41,44 @@ describe("fieldSubmit.vue", function() {
 			expect(input.value).to.be.equal("Submit form");
 		});
 
-		it("should not call validate if validateBeforeSubmit is false", () => {
-			schema.onSubmit = sinon.spy();
-			let cb = sinon.spy();
-			field.$parent.validate = cb;
+		describe("valid form", function() {
+			it("should not call validate if validateBeforeSubmit is false", () => {
+				schema.onSubmit = sinon.spy();
+				let cb = sinon.spy();
+				field.$parent.validate = cb;
 
-			input.click();
-			expect(cb.called).to.be.false;
-			expect(schema.onSubmit.calledOnce).to.be.true;
-			expect(schema.onSubmit.calledWith(model, schema)).to.be.true;
+				input.click();
+				expect(cb.called).to.be.false;
+				expect(schema.onSubmit.calledOnce).to.be.true;
+				expect(schema.onSubmit.calledWith(model, schema)).to.be.true;
+			});
+
+
+			it("should call validate if validateBeforeSubmit is true", () => {
+				schema.validateBeforeSubmit = true;
+				schema.onSubmit = sinon.spy();
+				let cb = sinon.spy();
+				field.$parent.validate = cb;
+
+				input.click();
+				expect(cb.called).to.be.true;
+				expect(schema.onSubmit.called).to.be.true;
+			});
 		});
 
+		describe("invalid form", function() {
+			it("should not call onSubmit if validateBeforeSubmit is true", () => {
+				schema.validateBeforeSubmit = true;
+				schema.onSubmit = sinon.spy();
+				let cb = sinon.spy(() => {
+					return ["an error occurred"];
+				});
+				field.$parent.validate = cb;
 
-		it("should call validate if validateBeforeSubmit is true", () => {
-			schema.validateBeforeSubmit = true;
-			schema.onSubmit = sinon.spy();
-			let cb = sinon.spy();
-			field.$parent.validate = cb;
-
-			input.click();
-			expect(cb.called).to.be.true;
-			expect(schema.onSubmit.called).to.be.false;
+				input.click();
+				expect(cb.called).to.be.true;
+				expect(schema.onSubmit.called).to.be.true;
+			});
 		});
 
 		describe("check optional attribute", () => {
@@ -72,6 +90,12 @@ describe("fieldSubmit.vue", function() {
 				});
 			});
 		});
+
+		it("should have 2 classes", () => {
+			expect(input.className.indexOf("applied-class")).not.to.be.equal(-1);
+			expect(input.className.indexOf("another-class")).not.to.be.equal(-1);
+		});
+
 	});
 
 });

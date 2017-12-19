@@ -3,7 +3,7 @@ div.vue-form-generator(v-if='schema != null')
 	fieldset(v-if="schema.fields", :is='tag')
 		template(v-for='field in fields')
 			.form-group(v-if='fieldVisible(field)', :class='getFieldRowClasses(field)')
-				label(v-if="fieldTypeHasLabel(field)", :for="getFieldID(field)")
+				label(v-if="fieldTypeHasLabel(field)", :for="getFieldID(field)", :class="field.labelClasses")
 					| {{ field.label }}
 					span.help(v-if='field.help')
 						i.icon
@@ -12,16 +12,16 @@ div.vue-form-generator(v-if='schema != null')
 					component(:is='getFieldType(field)', :disabled='fieldDisabled(field)', :model='model', :schema='field', :formOptions='options', @model-updated='modelUpdated', @validated="onFieldValidated")
 					.buttons(v-if='buttonVisibility(field)')
 						button(v-for='btn in field.buttons', @click='buttonClickHandler(btn, field, $event)', :class='btn.classes') {{ btn.label }}
-				.hint(v-if='field.hint') {{ field.hint }}
+				.hint(v-if='field.hint') {{ fieldHint(field) }}
 				.errors.help-block(v-if='fieldErrors(field).length > 0')
 					span(v-for='(error, index) in fieldErrors(field)', track-by='index') {{ error }}
 
 	template(v-for='group in groups')
-		fieldset
+		fieldset(:is='tag', :class='getFieldRowClasses(group)')
 			legend(v-if='group.legend') {{ group.legend }}
 			template(v-for='field in group.fields')
 				.form-group(v-if='fieldVisible(field)', :class='getFieldRowClasses(field)')
-					label(v-if="fieldTypeHasLabel(field)", :for="getFieldID(field)")
+					label(v-if="fieldTypeHasLabel(field)", :for="getFieldID(field)", :class="field.labelClasses")
 						| {{ field.label }}
 						span.help(v-if='field.help')
 							i.icon
@@ -37,7 +37,7 @@ div.vue-form-generator(v-if='schema != null')
 
 <script>
 	// import Vue from "vue";
-	import {each, isFunction, isNil, isArray, isString} from "lodash";
+	import { get as objGet, forEach, isFunction, isNil, isArray, isString } from "lodash";
 	import { slugifyFormID } from "./utils/schema";
 
 	// Load all fields from '../fields' folder
@@ -45,7 +45,7 @@ div.vue-form-generator(v-if='schema != null')
 
 	let coreFields = require.context("./fields/core", false, /^\.\/field([\w-_]+)\.vue$/);
 
-	each(coreFields.keys(), (key) => {
+	forEach(coreFields.keys(), (key) => {
 		let compName = key.replace(/^\.\//, "").replace(/\.vue/, "");
 		fieldComponents[compName] = coreFields(key);
 	});
@@ -53,7 +53,7 @@ div.vue-form-generator(v-if='schema != null')
 	if (process.env.FULL_BUNDLE) {  // eslint-disable-line
 		let Fields = require.context("./fields/optional", false, /^\.\/field([\w-_]+)\.vue$/);
 
-		each(Fields.keys(), (key) => {
+		forEach(Fields.keys(), (key) => {
 			let compName = key.replace(/^\.\//, "").replace(/\.vue/, "");
 			fieldComponents[compName] = Fields(key);
 		});
@@ -74,9 +74,10 @@ div.vue-form-generator(v-if='schema != null')
 				default()  {
 					return {
 						validateAfterLoad: false,
+						validateAsync: false,
 						validateAfterChanged: false,
 						validationErrorClass: "error",
-						validationSuccessClass: "",
+						validationSuccessClass: ""
 					};
 				}
 			},
@@ -110,7 +111,7 @@ div.vue-form-generator(v-if='schema != null')
 			fields() {
 				let res = [];
 				if (this.schema && this.schema.fields) {
-					each(this.schema.fields, (field) => {
+					forEach(this.schema.fields, (field) => {
 						if (!this.multiple || field.multi === true)
 							res.push(field);
 					});
@@ -121,7 +122,7 @@ div.vue-form-generator(v-if='schema != null')
 			groups() {
 				let res = [];
 				if (this.schema && this.schema.groups) {
-					each(this.schema.groups, (group) => {
+					forEach(this.schema.groups, (group) => {
 						res.push(group);
 					});
 				}
@@ -139,10 +140,11 @@ div.vue-form-generator(v-if='schema != null')
 				if (newModel != null) {
 					this.$nextTick(() => {
 						// Model changed!
-						if (this.options.validateAfterLoad === true && this.isNewModel !== true)
+						if (this.options.validateAfterLoad === true && this.isNewModel !== true) {
 							this.validate();
-						else
+						} else {
 							this.clearValidationErrors();
+						}
 					});
 				}
 			}
@@ -152,7 +154,7 @@ div.vue-form-generator(v-if='schema != null')
 			this.$nextTick(() => {
 				if (this.model) {
 					// First load, running validation if neccessary
-					if (this.options.validateAfterLoad === true && this.isNewModel !== true){
+					if (this.options.validateAfterLoad === true && this.isNewModel !== true) {
 						this.validate();
 					} else {
 						this.clearValidationErrors();
@@ -185,13 +187,15 @@ div.vue-form-generator(v-if='schema != null')
 				}
 
 				if (isArray(field.styleClasses)) {
-					each(field.styleClasses, (c) => baseClasses[c] = true);
+					forEach(field.styleClasses, (c) => baseClasses[c] = true);
 				}
 				else if (isString(field.styleClasses)) {
 					baseClasses[field.styleClasses] = true;
 				}
 
-				baseClasses["field-" + field.type] = true;
+				if (!isNil(field.type)) {
+					baseClasses["field-" + field.type] = true;
+				}
 
 				return baseClasses;
 			},
@@ -203,6 +207,8 @@ div.vue-form-generator(v-if='schema != null')
 
 			// Should field type have a label?
 			fieldTypeHasLabel(field) {
+				if(isNil(field.label)) return false;
+
 				let relevantType = "";
 				if (field.type === "input") {
 					relevantType = field.inputType;
@@ -211,12 +217,12 @@ div.vue-form-generator(v-if='schema != null')
 				}
 
 				switch (relevantType) {
-				case "button":
-				case "submit":
-				case "reset":
-					return false;
-				default:
-					return true;
+					case "button":
+					case "submit":
+					case "reset":
+						return false;
+					default:
+						return true;
 				}
 			},
 
@@ -274,6 +280,14 @@ div.vue-form-generator(v-if='schema != null')
 
 				return field.featured;
 			},
+			
+			// Get current hint.
+			fieldHint(field){
+				if (isFunction(field.hint))
+					return field.hint.call(this, this.model, field, this);
+
+				return field.hint;
+			},
 
 			buttonClickHandler(btn, field, event) {
 				return btn.onclick.call(this, this.model, field, event, this);
@@ -286,7 +300,7 @@ div.vue-form-generator(v-if='schema != null')
 
 				if (!res && errors && errors.length > 0) {
 					// Add errors with this field
-					errors.forEach((err) => {
+					forEach(errors, (err) => {
 						this.errors.push({
 							field: field.schema,
 							error: err
@@ -299,32 +313,52 @@ div.vue-form-generator(v-if='schema != null')
 			},
 
 			// Validating the model properties
-			validate() {
+			validate(isAsync = null) {
+				if(isAsync === null) {
+					isAsync = objGet(this.options, "validateAsync", false);
+				}
 				this.clearValidationErrors();
 
-				this.$children.forEach((child) => {
-					if (isFunction(child.validate))
-					{
-						let errors = child.validate(true);
-						errors.forEach((err) => {
-							this.errors.push({
-								field: child.schema,
-								error: err
-							});
-						});
+				let fields = [];
+				let results = [];
+
+				forEach(this.$children, (child) => {
+					if (isFunction(child.validate)) {
+						fields.push(child); // keep track of validated children
+						results.push(child.validate(true));
 					}
 				});
 
-				let isValid = this.errors.length == 0;
-				this.$emit("validated", isValid, this.errors);
-				return isValid;
+				let handleErrors = (errors) => {
+					let formErrors = [];
+					forEach(errors, (err, i) => {
+						if(isArray(err) && err.length > 0) {
+							forEach(err, (error) => {
+								formErrors.push({
+									field: fields[i].schema,
+									error: error,
+								});
+							});
+						}
+					});
+					this.errors = formErrors;
+					let isValid = formErrors.length == 0;
+					this.$emit("validated", isValid, formErrors);
+					return isAsync ? formErrors : isValid;
+				};
+
+				if(!isAsync) {
+					return handleErrors(results);
+				}
+
+				return Promise.all(results).then(handleErrors);
 			},
 
 			// Clear validation errors
 			clearValidationErrors() {
 				this.errors.splice(0);
 
-				each(this.$children, (child) => {
+				forEach(this.$children, (child) => {
 					child.clearValidationErrors();
 				});
 			},

@@ -191,6 +191,32 @@ describe("VueFormGenerator.vue", () => {
 
 	});
 
+	describe("check label classes", () => {
+		let schema = {
+			fields: [
+				{
+					type: "input",
+					inputType: "text",
+					label: "Name",
+					model: "name",
+					labelClasses: ["applied-class", "another-class"]
+				}
+			]
+		};
+		let label;
+
+		before( () => {
+			createFormGenerator(schema);
+			label = el.querySelector("label");
+		});
+
+		it("should be 2 classes", () => {
+			expect(label.classList.contains("applied-class")).to.be.true;
+			expect(label.classList.contains("another-class")).to.be.true;
+		});
+		
+	});
+
 	describe("check form row caption cell", () => {
 		let group, label;
 		let schema = {
@@ -434,6 +460,46 @@ describe("VueFormGenerator.vue", () => {
 			model.status = false;
 			vm.$nextTick(() => {
 				expect(el.querySelector(".form-group").classList.contains("readonly")).to.be.false;
+				done();
+			});
+		});
+
+	});
+
+	describe("check fieldHint with function", () => {
+		let schema = {
+			fields: [
+				{
+					type: "textArea",
+					label: "Note",
+					model: "note",
+					max: 500,
+					rows: 4,
+					hint(model) {
+						if (model && model.note) {
+							return model.note.length + " of max 500 characters used!";
+						}
+					}
+				}
+			]
+		};
+
+		let model = {
+			note: "John Doe"
+		};
+
+		before( () => {
+			createFormGenerator(schema, model);
+		});
+
+		it("should be applay", () => {
+			expect(el.querySelector(".form-group .hint").textContent).to.be.equal("8 of max 500 characters used!");
+		});
+
+		it("should be changed", (done) => {
+			model.note= "Dr. John Doe";
+			vm.$nextTick(() => {
+				expect(el.querySelector(".form-group .hint").textContent).to.be.equal("12 of max 500 characters used!");
 				done();
 			});
 		});
@@ -812,8 +878,6 @@ describe("VueFormGenerator.vue", () => {
 
 			expect(form.errors).to.be.length(1);
 			expect(onValidated.callCount).to.be.equal(1);
-			// console.log(onValidated.getCall(0).args[1][0].field);
-			// console.log(schema.fields[0]);
 			expect(onValidated.calledWith(false, [{ field: schema.fields[0], error: "The length of text is too small! Current: 1, Minimum: 3"}] )).to.be.true;
 		});
 
@@ -926,8 +990,6 @@ describe("VueFormGenerator.vue", () => {
 
 			expect(form.errors).to.be.length(1);
 			expect(onValidated.callCount).to.be.equal(1);
-			// console.log(onValidated.getCall(0).args[1][0].field);
-			// console.log(schema.fields[0]);
 			expect(onValidated.calledWith(false, [{ field: schema.fields[0], error: "The length of text is too small! Current: 1, Minimum: 3"}] )).to.be.true;
 		});
 
@@ -959,12 +1021,13 @@ describe("VueFormGenerator.vue", () => {
 					label: "Name",
 					model: "name",
 					validator(value) {
-						return new Promise(resolve => {
+						return new Promise( (resolve) => {
 							setTimeout(() => {
-								if (value.length >= 3)
+								if (value.length >= 3) {
 									resolve();
-								else
+								} else {
 									resolve([ "Invalid name" ]);
+								}
 							}, 50);
 						});
 					}
@@ -1007,7 +1070,7 @@ describe("VueFormGenerator.vue", () => {
 			});
 		});
 
-		it("should be validation error if model value is not valid", cb => {
+		it("should be validation error if model value is not valid", (done) => {
 			onValidated.reset();
 			vm.model.name = "A";
 			field.validate();
@@ -1016,7 +1079,7 @@ describe("VueFormGenerator.vue", () => {
 				expect(form.errors).to.be.length(1);
 				expect(onValidated.calledWith(false, [{ field: schema.fields[0], error: "Invalid name"}] )).to.be.true;
 
-				cb();
+				done();
 			}, 100);
 		});
 	});
@@ -1029,20 +1092,31 @@ describe("VueFormGenerator.vue", () => {
 		});
 
 		it("should return true", () => {
-			expect(form.fieldTypeHasLabel({ type: "input", inputType: "checkbox"})).to.be.true;
-			expect(form.fieldTypeHasLabel({ type: "input", inputType: "text"})).to.be.true;
-			expect(form.fieldTypeHasLabel({ type: "checklist" })).to.be.true;
-			expect(form.fieldTypeHasLabel({ type: "input", inputType: "image"})).to.be.true;
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "checkbox", label: "checkbox"})).to.be.true;
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "text", label: "text"})).to.be.true;
+			expect(form.fieldTypeHasLabel({ type: "checklist",label: "checklist"})).to.be.true;
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "image", label: "image"})).to.be.true;
 		});
 
 		it("should return false", () => {
+			// with label text defined
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "button", label: "button"})).to.be.false;
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "submit", label: "submit"})).to.be.false;
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "reset", label: "reset"})).to.be.false;
+
+			// without label text defined
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "checkbox"})).to.be.false;
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "text"})).to.be.false;
+			expect(form.fieldTypeHasLabel({ type: "checklist"})).to.be.false;
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "image"})).to.be.false;
 			expect(form.fieldTypeHasLabel({ type: "input", inputType: "button"})).to.be.false;
 			expect(form.fieldTypeHasLabel({ type: "input", inputType: "submit"})).to.be.false;
 			expect(form.fieldTypeHasLabel({ type: "input", inputType: "reset"})).to.be.false;
 		});
 
 		it("should default to true for unknown types", () => {
-			expect(form.fieldTypeHasLabel({ type: "input", inputType: "unsupported-or-unknown"})).to.be.true;
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "unsupported-or-unknown", label:"unsupported"})).to.be.true;
+			expect(form.fieldTypeHasLabel({ type: "input", inputType: "unsupported-or-unknown"})).to.be.false;
 		});
 	});
 
