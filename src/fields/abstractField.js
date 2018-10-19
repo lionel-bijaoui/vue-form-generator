@@ -1,5 +1,5 @@
 import { get as objGet, forEach, isFunction, isString, isArray, debounce, isNil, uniqueId } from "lodash";
-import validators from "../utils/validators";
+import validators from "../utils/validators.js";
 
 const convertValidator = (validator) => {
 	if (isString(validator)) {
@@ -151,10 +151,10 @@ export default {
 			) {
 				let validators = [];
 				if (!isArray(this.schema.validator)) {
-					validators.push(convertValidator(this.schema.validator).bind(this));
+					validators.push(convertValidator(this.schema.validator));
 				} else {
 					this.schema.validator.forEach((validator) => {
-						validators.push(convertValidator(validator).bind(this));
+						validators.push(convertValidator(validator));
 					});
 				}
 
@@ -211,7 +211,7 @@ export default {
 		debouncedValidate() {
 			if (!isFunction(this.debouncedValidateFunc)) {
 				this.debouncedValidateFunc = debounce(
-					this.validate.bind(this),
+					this.validate,
 					objGet(this.formOptions, "validateDebounceTime", 500)
 				);
 			}

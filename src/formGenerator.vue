@@ -273,7 +273,7 @@ export default {
 					this.eventBus.$off("field-validated", this.onFieldValidated);
 				}
 				this.eventBus.$on("field-validated", counter);
-				this.eventBus.$emit("validate-fields", this);
+				this.eventBus.$emit("validate-fields");
 			});
 		},
 
